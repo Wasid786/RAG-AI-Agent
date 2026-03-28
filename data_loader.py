@@ -16,8 +16,10 @@ splitter = SentenceSplitter(chunk_size=1000, chunk_overlap=200)
 
 
 def load_and_chunk_pdf(path: str) -> list[str]:
-    """Load a PDF file and split it into text chunks."""
-    docs   = PDFReader().load_data(file=path)  # type: ignore
+    docs = PDFReader().load_data(file=path) # type: ignore
+    print(f"Pages loaded: {len(docs)}")          
+    for i, d in enumerate(docs):
+        print(f"Page {i+1} text length: {len(d.text)}")  # and this
     texts  = [d.text for d in docs if getattr(d, "text", None)]
     chunks = []
     for t in texts:
