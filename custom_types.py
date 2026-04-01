@@ -15,4 +15,4 @@ class RAGSSearchResult(pydantic.BaseModel):
 class RAQQueryResult(pydantic.BaseModel):
     answer: str
     sources: list[str]
-    num_contexts : int 
+    num_contexts : int

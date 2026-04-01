@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+qdrant-client
+inngest
+python-dotenv
+llama-index
+llama-index-readers-file
+llama-index-core
+requests
+pydantic
+streamlit
+groq  # optional
