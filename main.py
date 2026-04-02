@@ -1,24 +1,4 @@
-"""
-main.py
-───────
-FastAPI + Inngest backend for the RAG (Retrieval-Augmented Generation) app.
 
-What this file does:
-  1. Exposes two Inngest event-driven functions:
-       • rag/ingest_pdf  — read a PDF, embed it, store in Qdrant
-       • rag/query_pdf_ai — embed a question, search Qdrant, answer with Groq
-
-  2. Starts a FastAPI server that Inngest talks to.
-
-Flow:
-  PDF ──► load_and_chunk_pdf ──► embed_texts (LOCAL) ──► Qdrant (LOCAL)
-  Question ──► embed_texts (LOCAL) ──► Qdrant search ──► Groq LLM ──► Answer
-
-Dependencies you need running:
-  • Qdrant   — docker run -p 6333:6333 qdrant/qdrant
-  • Inngest  — npx inngest-cli@latest dev
-  • This app — uvicorn main:app --reload
-"""
 
 import logging
 import os
@@ -54,6 +34,11 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 #   "llama3-70b-8192"     — slower, highest quality
 #   "gemma2-9b-it"        — good balance of speed & quality
 CHAT_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
+
+# ── Qdrant Cloud settings ─────────────────────────────────────────────────────
+# Get these from https://cloud.qdrant.io (free tier available)
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,14 +128,6 @@ inngest_client = inngest.Inngest(
     serializer=inngest.PydanticSerializer(),
 )
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FUNCTION 1 — Ingest a PDF
-# Triggered by the event: "rag/ingest_pdf"
-# Steps:
-#   Step 1 — load-and-chunk : read the PDF, split into text chunks
-#   Step 2 — embed-and-upsert: embed chunks locally, store in Qdrant
-# ═══════════════════════════════════════════════════════════════════════════════
 @inngest_client.create_function(
     fn_id="rag_ingest_pdf",
     trigger=inngest.TriggerEvent(event="rag/ingest_pdf"),
@@ -177,11 +154,8 @@ async def rag_ingest_pdf(ctx: inngest.Context):
         return RAGChunkAndSrc(chunks=chunks, source_id=source_id)  # type: ignore
 
     def _upsert(chunks_and_src: RAGChunkAndSrc) -> RAGUpsertResult:
-        """
-        Step 2: Embed chunks using the LOCAL model, then store in Qdrant.
-        Note: embed_texts() runs on your machine — no API key needed!
-        """
-        chunks    = chunks_and_src.chunks
+        """Step 2: Embed chunks and store in Qdrant."""
+        chunks = chunks_and_src.chunks
         source_id = chunks_and_src.source_id
 
         # ── Local embedding (no API key needed) ──────────────────────────────
@@ -199,7 +173,12 @@ async def rag_ingest_pdf(ctx: inngest.Context):
             for i in range(len(chunks))
         ]
 
-        QdrantStorage().upsert(ids, vecs, payloads)
+        # Use cloud config if available, otherwise falls back to local
+        store = QdrantStorage(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY, # type: ignore
+        )
+        store.upsert(ids, vecs, payloads)
         return RAGUpsertResult(ingested=len(chunks))
 
     # Run step 1
@@ -239,8 +218,13 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
         """
         # Embed the question using the same local model used during ingestion
         query_vec = embed_texts([question])[0]
-        store     = QdrantStorage()
-        found     = store.search(query_vec, top_k)
+        
+        # Use cloud config if available, otherwise falls back to local
+        store = QdrantStorage(
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY, # type: ignore
+        )
+        found = store.search(query_vec, top_k)
         return RAGSSearchResult(
             contexts=found["contexts"],
             sources=found["sources"],
@@ -314,10 +298,14 @@ app = FastAPI(title="RAG PDF API")
 @app.get("/")
 def home():
     """Quick status check — visit http://localhost:8000 in your browser."""
+    # Determine which Qdrant we're using
+    qdrant_type = "Qdrant Cloud" if QDRANT_API_KEY else "Local Qdrant"
+    
     return {
         "status": "✅ RAG API is running",
         "llm":    f"Groq → {CHAT_MODEL}",
         "embed":  "Local → BAAI/bge-small-en-v1.5 (no API key needed)",
+        "vector_db": f"{qdrant_type} ({QDRANT_URL})",
     }
 
 

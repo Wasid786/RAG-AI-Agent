@@ -1,12 +1,12 @@
-fastapi
-uvicorn
-qdrant-client
-inngest
-python-dotenv
-llama-index
-llama-index-readers-file
-llama-index-core
-requests
-pydantic
-streamlit
-groq  # optional
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+inngest==0.3.5
+qdrant-client==1.7.0
+sentence-transformers==2.2.2
+llama-index-readers-file==0.1.22
+llama-index-core==0.10.24
+pypdf==3.17.4
+python-dotenv==1.0.0
+pydantic==2.5.0
+requests==2.31.0
+streamlit==1.29.0
