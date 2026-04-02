@@ -1,16 +1,10 @@
 """
 vector_db.py
 ────────────
-Wraps Qdrant (a local vector database) so the rest of the app
-can store and search embedding vectors without worrying about
-the Qdrant client details.
-
-Qdrant runs locally in Docker. Start it with:
-    docker run -p 6333:6333 qdrant/qdrant
-
-No API key needed — it's just a local service on port 6333.
+Wraps Qdrant (local or cloud) for storing and searching embedding vectors.
 """
 
+import os
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct
 
@@ -18,58 +12,66 @@ from qdrant_client.models import VectorParams, Distance, PointStruct
 class QdrantStorage:
     """
     A simple wrapper around Qdrant for storing and searching text embeddings.
-
-    How it works:
-      • upsert() — saves text chunks + their vectors into Qdrant.
-      • search() — finds the most similar chunks to a query vector.
+    Supports both local Docker and Qdrant Cloud.
     """
 
     def __init__(
         self,
-        url: str = "http://localhost:6333",
+        url: str = None, # type: ignore
+        api_key: str = None, # type: ignore
         collection: str = "docs",
-        dim: int = 384,          # must match EMBED_DIM in data_loader.py
+        dim: int = 384,
     ):
         """
-        Connect to the local Qdrant instance and create the collection
-        if it doesn't exist yet.
+        Connect to Qdrant (local or cloud).
 
         Args:
-            url:        Address of the Qdrant server (default: local Docker).
-            collection: Name of the vector collection to use.
-            dim:        Dimension of the embedding vectors (384 for bge-small).
+            url: Qdrant server URL (default: localhost:6333)
+            api_key: API key for Qdrant Cloud (not needed for local)
+            collection: Name of the vector collection
+            dim: Dimension of embedding vectors (384 for bge-small)
         """
-        self.client     = QdrantClient(url=url, timeout=30)
         self.collection = collection
+        
+        # Use environment variables if provided
+        self.url = url or os.getenv("QDRANT_URL", "http://localhost:6333")
+        self.api_key = api_key or os.getenv("QDRANT_API_KEY", None)
+        
+        # Connect to Qdrant
+        if self.api_key:
+            self.client = QdrantClient(
+                url=self.url,
+                api_key=self.api_key,
+                timeout=60
+            )
+            print(f"✅ Connected to Qdrant Cloud: {self.url}")
+        else:
+            self.client = QdrantClient(
+                url=self.url,
+                timeout=30
+            )
+            print(f"✅ Connected to local Qdrant: {self.url}")
 
-        # Create the collection only if it doesn't already exist
+        # Create collection if it doesn't exist
         if not self.client.collection_exists(self.collection):
             self.client.create_collection(
                 collection_name=self.collection,
                 vectors_config=VectorParams(
                     size=dim,
-                    distance=Distance.COSINE,   # best for normalized embeddings
+                    distance=Distance.COSINE,
                 ),
             )
             print(f"✅ Created Qdrant collection: '{self.collection}'")
         else:
             print(f"📦 Using existing Qdrant collection: '{self.collection}'")
 
-    # ─────────────────────────────────────────────────────────────────────────
     def upsert(
         self,
-        ids:      list[str],
-        vectors:  list[list[float]],
+        ids: list[str],
+        vectors: list[list[float]],
         payloads: list[dict],
     ) -> None:
-        """
-        Save a batch of text chunks and their vectors into Qdrant.
-
-        Args:
-            ids:      Unique string IDs for each chunk (we use UUID5s in main.py).
-            vectors:  Embedding vectors — one per chunk.
-            payloads: Metadata dicts with keys "text" and "source".
-        """
+        """Save a batch of text chunks and their vectors into Qdrant."""
         points = [
             PointStruct(id=ids[i], vector=vectors[i], payload=payloads[i])
             for i in range(len(ids))
@@ -77,24 +79,12 @@ class QdrantStorage:
         self.client.upsert(collection_name=self.collection, points=points)
         print(f"💾 Stored {len(points)} chunks in Qdrant.")
 
-    # ─────────────────────────────────────────────────────────────────────────
     def search(
         self,
         query_vector: list[float],
         top_k: int = 5,
     ) -> dict:
-        """
-        Find the top-k most similar chunks to the query vector.
-
-        Args:
-            query_vector: Embedding of the user's question.
-            top_k:        How many chunks to return.
-
-        Returns:
-            A dict with:
-              "contexts" — list of matching text chunks
-              "sources"  — list of source file names
-        """
+        """Find the top-k most similar chunks to the query vector."""
         results = self.client.query_points(
             collection_name=self.collection,
             query=query_vector,
@@ -103,12 +93,12 @@ class QdrantStorage:
         ).points
 
         contexts = []
-        sources  = set()   # use a set to avoid duplicate source names
+        sources = set()
 
         for point in results:
             payload = getattr(point, "payload", None) or {}
-            text    = payload.get("text", "")
-            source  = payload.get("source", "")
+            text = payload.get("text", "")
+            source = payload.get("source", "")
             if text:
                 contexts.append(text)
                 sources.add(source)
