@@ -124,7 +124,7 @@ def groq_chat(system_prompt: str, user_prompt: str, temperature: float = 0.2) ->
 inngest_client = inngest.Inngest(
     app_id="rag_app",
     logger=logging.getLogger("uvicorn"),
-    is_production=False,
+    is_production=os.getenv("RENDER", "").lower() == "true",
     serializer=inngest.PydanticSerializer(),
 )
 
