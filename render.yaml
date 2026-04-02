@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: rag-backend
+    runtime: docker
+    repo: https://github.com/Wasid786/RAG-AI-Agent.git  # Change this!
+    plan: free
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: INNGEST_API_BASE
+        value: https://api.inngest.com
+      - key: GROQ_MODEL
+        value: mixtral-8x7b-32768
+    healthCheckPath: /health
