@@ -11,8 +11,45 @@ load_dotenv()
 
 st.set_page_config(page_title="RAG PDF Chat", page_icon="📄", layout="centered")
 
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-# ── Safe async runner (FIX) ───────────────────────────────────────────────────
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+}
+
+.stApp {
+    background-color: #6b3a1f;
+}
+
+.stButton > button {
+    background-color: #fef9c3 !important;
+    color: #6b3a1f !important;
+    border-radius: 6px !important;
+    border: none !important;
+    padding: 0.45rem 1.4rem !important;
+    font-weight: 500 !important;
+    font-size: 0.85rem !important;
+}
+.stButton > button:hover {
+    background-color: #e8e08a !important;
+}
+
+input[type="text"], input[type="number"] {
+    border-radius: 6px !important;
+    border: 1px solid #d1d5db !important;
+    font-size: 0.875rem !important;
+}
+input[type="text"]:focus, input[type="number"]:focus {
+    border-color: #fef9c3 !important;
+    box-shadow: 0 0 0 2px rgba(254,249,195,0.4) !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ── Safe async runner ─────────────────────────────────────────────────────────
 def run_async(coro):
     try:
         loop = asyncio.get_event_loop()
@@ -105,7 +142,8 @@ def wait_for_run_output(event_id: str, timeout_s: float = 120.0, poll_interval_s
 # ══════════════════════════════════════════════════════════════════════════════
 # UI — Section 1: Ingest
 # ══════════════════════════════════════════════════════════════════════════════
-st.title("📄 Upload a PDF to Ingest")
+st.title("📄 Upload a PDF")
+st.caption("Upload a document to add it to the knowledge base.")
 
 if "last_ingested" not in st.session_state:
     st.session_state.last_ingested = None
@@ -113,17 +151,17 @@ if "last_ingested" not in st.session_state:
 uploaded = st.file_uploader("Choose a PDF", type=["pdf"], accept_multiple_files=False)
 
 if uploaded is not None and uploaded.name != st.session_state.last_ingested:
-    with st.spinner(f"Uploading and triggering ingestion for {uploaded.name}..."):
+    with st.spinner(f"Ingesting {uploaded.name}..."):
         path = save_uploaded_pdf(uploaded)
-        run_async(_send_ingest_event(path))   # ✅ FIXED
+        run_async(_send_ingest_event(path))
         time.sleep(0.3)
 
     st.session_state.last_ingested = uploaded.name
-    st.success(f"✅ Ingestion triggered for: **{uploaded.name}**")
-    st.caption("You can upload another PDF if you like.")
+    st.success(f"✅ Done! **{uploaded.name}** is ready to query.")
+    st.caption("Upload another PDF to expand the knowledge base.")
 
 elif uploaded is not None:
-    st.info(f"**{uploaded.name}** has already been ingested this session.")
+    st.info(f"**{uploaded.name}** was already ingested this session.")
 
 st.divider()
 
@@ -132,6 +170,7 @@ st.divider()
 # UI — Section 2: Query
 # ══════════════════════════════════════════════════════════════════════════════
 st.title("💬 Ask a Question")
+st.caption("Ask anything about the uploaded document(s).")
 
 if "last_answer" not in st.session_state:
     st.session_state.last_answer = None
@@ -140,29 +179,29 @@ if "last_answer" not in st.session_state:
 with st.form("rag_query_form"):
     question = st.text_input("Your question", placeholder="e.g. What is this document about?")
     top_k = st.number_input("Chunks to retrieve", min_value=1, max_value=20, value=5, step=1)
-    submitted = st.form_submit_button("Ask")
+    submitted = st.form_submit_button("Ask →")
 
 if submitted and question.strip():
     with st.spinner("Thinking..."):
         try:
-            event_id = run_async(_send_query_event(question.strip(), int(top_k)))  # ✅ FIXED
+            event_id = run_async(_send_query_event(question.strip(), int(top_k)))
             output = wait_for_run_output(event_id)
 
             st.session_state.last_answer = output.get("answer", "")
             st.session_state.last_sources = output.get("sources", [])
 
         except TimeoutError:
-            st.error("⏱ Timed out waiting for an answer. Is your backend running?")
+            st.error("⏱ Timed out. Is your backend running?")
         except Exception as e:
             st.error(f"❌ Error: {e}")
 
 
 # ── Display Answer ────────────────────────────────────────────────────────────
 if st.session_state.last_answer:
-    st.subheader("Answer")
-    st.write(st.session_state.last_answer)
+    st.subheader("🧠 Answer")
+    st.info(st.session_state.last_answer)
 
     if st.session_state.last_sources:
-        st.caption("Sources")
-        for s in st.session_state.last_sources:
-            st.write(f"- {s}")
+        with st.expander("📎 Sources", expanded=False):
+            for s in st.session_state.last_sources:
+                st.markdown(f"- `{s}`")
