@@ -1,7 +1,15 @@
 #  RAG PDF Chat
 
-A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask questions about them.  
-Uses **HuggingFace Inference API** (free) for embeddings & chat, **Qdrant** for vector storage, **Inngest** for workflow orchestration, and **Streamlit** for the UI.
+A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask questions about them.
+
+| Layer | Tool |
+|---|---|
+| Embeddings | `BAAI/bge-small-en-v1.5` via `sentence-transformers` (runs **100% locally**, no API key) |
+| Chat / LLM | [Groq](https://console.groq.com) free inference API (`mixtral-8x7b-32768` by default) |
+| Vector DB | [Qdrant](https://qdrant.tech) running locally in Docker |
+| Orchestration | [Inngest](https://www.inngest.com) dev server |
+| Frontend | [Streamlit](https://streamlit.io) |
+| Backend | [FastAPI](https://fastapi.tiangolo.com) + Uvicorn |
 
 ---
 
@@ -11,110 +19,157 @@ Uses **HuggingFace Inference API** (free) for embeddings & chat, **Qdrant** for 
 .
 ├── main.py            # FastAPI + Inngest backend (ingest & query functions)
 ├── streamlit_app.py   # Streamlit frontend UI
+├── data_loader.py     # PDF loading, chunking, and local embeddings
+├── vector_db.py       # Qdrant vector DB wrapper
+├── custom_types.py    # Pydantic models for Inngest step I/O
+├── requirements.txt   # All Python dependencies
+=======
 ├── data_loader.py     # PDF loading, chunking, and HF embeddings
 ├── vector_db.py       # Qdrant vector DB wrapper
 ├── custom_types.py    # Pydantic models
+
 ├── .env               # Your secrets (never commit this)
 └── README.md
 ```
 
 ---
 
+
 ##  Prerequisites
 
-Make sure the following are installed on your system before starting:
+Make sure the following are installed **before** starting:
 
 - Python 3.10 or higher
-- [Docker](https://docs.docker.com/get-docker/) (for running Qdrant)
-- [Node.js 18+](https://nodejs.org/) (for running Inngest Dev Server)
-- A free [HuggingFace account](https://huggingface.co/join)
+- [Docker Desktop](https://docs.docker.com/get-docker/) — for running Qdrant
+- [Node.js 18+](https://nodejs.org/) — for running the Inngest Dev Server
+- A free [Groq account](https://console.groq.com) — for the LLM API key
 
 ---
 
-##  Step 1 — Get a HuggingFace API Token
+##  Setup — Step by Step
 
-1. Go to [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-2. Click **New token** → choose **Read** role → copy the token
+### Step 1 — Clone / Download the Project
+
+```bash
+# If using git:
+git clone <your-repo-url>
+cd <your-repo-folder>
+
+# Or just navigate to your project folder:
+cd D:\Projects\RAG_llm_project
+```
 
 ---
 
-##  Step 2 — Configure Environment Variables
+### Step 2 — Get a Groq API Key
+
+1. Go to [https://console.groq.com](https://console.groq.com) and sign up for free
+2. Click **API Keys** → **Create API Key**
+3. Copy the key — you'll need it in Step 4
+
+---
+
+### Step 3 — Create and Activate a Virtual Environment
+
+```bash
+# Create the virtual environment
+python -m venv .venv
+```
+
+```bash
+# Activate — Windows (Command Prompt)
+.venv\Scripts\activate
+
+# Activate — Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+
+# Activate — macOS / Linux
+source .venv/bin/activate
+```
+
+---
+
+### Step 4 — Configure Environment Variables
 
 Create a `.env` file in the project root:
 
 ```bash
-cp .env.example .env
+# Windows (Command Prompt)
+copy NUL .env
+
+# macOS / Linux
+touch .env
 ```
 
-Then open `.env` and fill in your token:
+Open `.env` and add the following:
 
 ```env
-HF_API_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Required — get this from https://console.groq.com
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# Optional: change the chat model (default: mistralai/Mistral-7B-Instruct-v0.3)
-# HF_CHAT_MODEL=HuggingFaceH4/zephyr-7b-beta
+# Optional — change the Groq model (default: mixtral-8x7b-32768)
+# Options (fastest → most capable):
+#   llama3-8b-8192        very fast, good for simple Q&A
+#   mixtral-8x7b-32768    fast, excellent quality  ← default
+#   llama3-70b-8192       slower, highest quality
+#   gemma2-9b-it          good balance
+# GROQ_MODEL=mixtral-8x7b-32768
 
-# Inngest dev server base URL (no change needed for local dev)
-INNGEST_API_BASE=http://127.0.0.1:8288/v1
+# Optional — Inngest dev server base URL (no change needed for local dev)
+# INNGEST_API_BASE=http://127.0.0.1:8288/v1
 ```
 
 ---
 
-##  Step 3 — Create a Virtual Environment & Install Dependencies
+### Step 5 — Install Dependencies
 
 ```bash
-# Create virtual environment
-python -m venv .venv
-
-# Activate it — Linux/macOS
-source .venv/bin/activate
-
-# Activate it — Windows
-.venv\Scripts\activate
-
-# Upgrade pip
+# Upgrade pip first
 pip install --upgrade pip
 
 # Install all dependencies
-pip install fastapi uvicorn streamlit inngest qdrant-client \
-            llama-index llama-index-readers-file \
-            python-dotenv requests pydantic
+pip install -r requirements.txt
 ```
 
+> **Note:** `sentence-transformers` will download the embedding model (`BAAI/bge-small-en-v1.5`, ~130 MB) the **first time** you run the app. After that it runs fully offline.
 
 ---
 
-##  Step 4 — Start Qdrant (Vector Database)
+### Step 6 — Start Qdrant (Vector Database) via Docker
 
-Run Qdrant locally using Docker:
+Open a **new terminal** and run:
 
 ```bash
+# Pull the Qdrant image (only needed once)
 docker pull qdrant/qdrant
 
-docker run -d \
-  --name qdrant \
-  -p 6333:6333 \
-  -v $(pwd)/qdrant_data:/qdrant/storage \
-  qdrant/qdrant
+# Run Qdrant on port 6333
+# Windows (Command Prompt)
+docker run -d --name qdrant -p 6333:6333 -v %cd%/qdrant_data:/qdrant/storage qdrant/qdrant
+
+# Windows (PowerShell)
+docker run -d --name qdrant -p 6333:6333 -v ${PWD}/qdrant_data:/qdrant/storage qdrant/qdrant
+
+# macOS / Linux
+docker run -d --name qdrant -p 6333:6333 -v $(pwd)/qdrant_data:/qdrant/storage qdrant/qdrant
 ```
 
-Verify it's running:
+Verify Qdrant is running:
 
 ```bash
 curl http://localhost:6333/healthz
-# Expected: {"title":"qdrant - vector search engine","version":"..."}
+# Expected output: {"title":"qdrant - vector search engine","version":"..."}
 ```
-
-> **Windows users:** Replace `$(pwd)` with `%cd%` in Command Prompt, or use `${PWD}` in PowerShell.
 
 ---
 
-##  Step 5 — Start the Inngest Dev Server
+### Step 7 — Start the Inngest Dev Server
 
-Inngest orchestrates the ingest and query workflow steps.
+Open a **new terminal** and run:
 
 ```bash
-# Install Inngest CLI (once)
+# Install Inngest CLI globally (only needed once)
+
 npm install -g inngest-cli
 
 # Start the dev server
@@ -125,46 +180,74 @@ The Inngest dashboard will be available at [http://localhost:8288](http://localh
 
 ---
 
-##  Step 6 — Start the FastAPI Backend
 
-In a **new terminal** (with your virtual environment activated):
+### Step 8 — Start the FastAPI Backend
+
+Open a **new terminal** (with your virtual environment activated) and run:
+
 
 ```bash
 uvicorn main:app --reload --port 8000
 ```
 
-Verify it's running:
+
+Verify the backend is running:
 
 ```bash
 curl http://localhost:8000/
-# Expected: {"status":"RAG API running"}
+# Expected: {"status":" RAG API is running", ...}
 ```
 
 ---
 
-##  Step 7 — Start the Streamlit Frontend
+### Step 9 — Start the Streamlit Frontend
 
-In another **new terminal** (with your virtual environment activated):
+Open a **new terminal** (with your virtual environment activated) and run:
+
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-The app will open at [http://localhost:8501](http://localhost:8501).
+
+The app will open automatically at [http://localhost:8501](http://localhost:8501).
 
 ---
 
+##  Running Order (Every Time)
 
+You need **4 terminals** running simultaneously in this order:
 
-```python
-# Run this once in a Python shell
-from qdrant_client import QdrantClient
-QdrantClient("http://localhost:6333").delete_collection("docs")
-```
+| # | Terminal | Command |
+|---|---|---|
+| 1 | Qdrant (Docker) | `docker start qdrant` *(if already created)* |
+| 2 | Inngest Dev Server | `inngest dev` |
+| 3 | FastAPI Backend | `uvicorn main:app --reload --port 8000` |
+| 4 | Streamlit Frontend | `streamlit run streamlit_app.py` |
 
-Or via the Qdrant REST API:
+> On first run, use the full `docker run ...` command from Step 6. On subsequent runs, use `docker start qdrant`.
+
+---
+
+## 🤖 Models Used
+
+| Purpose | Model | Runs where |
+|---|---|---|
+| Embeddings | `BAAI/bge-small-en-v1.5` (384-dim) | **Locally** on your machine — no API key needed |
+| Chat / LLM | `mixtral-8x7b-32768` (default) | **Groq cloud** — free API key required |
+
+---
+
+## 🗑️ Reset the Vector Database
+
+If you want to clear all ingested documents and start fresh:
 
 ```bash
+# Option 1 — Python shell (with venv activated)
+python -c "from qdrant_client import QdrantClient; QdrantClient('http://localhost:6333').delete_collection('docs')"
+
+# Option 2 — curl
+
 curl -X DELETE http://localhost:6333/collections/docs
 ```
 
@@ -172,44 +255,42 @@ Then re-ingest your PDFs through the Streamlit UI.
 
 ---
 
+
 ##  Stopping All Services
 
 ```bash
-# Stop Qdrant container
+# Stop Qdrant Docker container
 docker stop qdrant
 
-# Stop FastAPI (Ctrl+C in its terminal)
-# Stop Streamlit (Ctrl+C in its terminal)
-# Stop Inngest dev server (Ctrl+C in its terminal)
+# Stop FastAPI   → Ctrl+C in its terminal
+# Stop Streamlit → Ctrl+C in its terminal
+# Stop Inngest   → Ctrl+C in its terminal
 ```
 
-
 ---
 
-## 🤖 Models Used
+## ⚠️ Common Issues
 
-| Purpose    | Model                                        | Dim  |
-|------------|----------------------------------------------|------|
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2`     | 384  | 
-| Chat / LLM | `mistralai/Mistral-7B-Instruct-v0.3`         | —    |
+**`[WinError 10061] No connection could be made` / Qdrant refused connection**
+→ Qdrant Docker container is not running. Run `docker start qdrant` or repeat Step 6.
 
-Both are served via the **HuggingFace free Inference API** — no GPU or credit card required.
+**`GROQ_API_KEY is missing` error**
+→ Your `.env` file is missing or the key is not set. Re-check Step 4.
 
----
+**`401 Unauthorized` from Groq**
+→ Your `GROQ_API_KEY` is invalid or expired. Get a new one at [https://console.groq.com](https://console.groq.com).
 
-##  Common Issues
-
-**`401 Unauthorized` from HuggingFace**
-→ Your `HF_API_TOKEN` in `.env` is missing or incorrect. Re-check Step 1.
-
-**`Model is currently loading` error**
-→ HF free tier cold-starts models. The code sets `wait_for_model: true` so it retries automatically. Wait a few seconds and try again.
-
-**Qdrant dimension mismatch error**
-→ You have an old collection with a different vector size. Run the delete command in the upgrade section above.
+**`429 Too Many Requests` from Groq**
+→ You've hit the free tier rate limit. Wait a few seconds and try again, or switch to a faster model like `llama3-8b-8192`.
 
 **`Connection refused` on port 8288**
-→ The Inngest dev server is not running. Complete Step 5 first.
+→ The Inngest dev server is not running. Complete Step 7 first.
 
-**Streamlit shows `Timed out waiting for an answer`**
-→ Make sure all four services (Qdrant, Inngest, FastAPI, Streamlit) are running simultaneously.
+**`Connection refused` on port 8000**
+→ The FastAPI backend is not running. Complete Step 8 first.
+
+**Streamlit shows `Timed out`**
+→ Make sure all 4 services (Qdrant, Inngest, FastAPI, Streamlit) are running simultaneously.
+
+**Qdrant dimension mismatch error**
+→ You have an old collection from a different embedding model. Delete it using the reset command above.
