@@ -13,6 +13,9 @@ A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask que
 
 ---
 
+## Demo Video
+[Watch Demo Video](https://drive.google.com/file/d/1jhwXbeSs0T0oPru2FQD74sG5rYLamxPS/view)
+
 ##  Project Structure
 
 ```
