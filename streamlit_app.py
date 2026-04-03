@@ -66,7 +66,7 @@ def run_async(coro):
 #  Inngest client 
 @st.cache_resource
 def get_inngest_client() -> inngest.Inngest:
-    return inngest.Inngest(app_id="rag_app", is_production=False)
+    return inngest.Inngest(app_id="rag_app", is_production=True)
 
 
 #  Helpers 
@@ -107,7 +107,26 @@ async def _send_query_event(question: str, top_k: int) -> str:
 
 
 def _inngest_api_base() -> str:
-    return os.getenv("INNGEST_API_BASE", "http://127.0.0.1:8288/v1")
+    """
+    Determine the Inngest API base URL based on environment.
+    
+    Returns:
+        - Render backend URL if running on Render (production)
+        - Local Inngest dev server URL for development
+        - Falls back to environment variable if set
+    """
+    # Check if running on Render (production)
+    if os.getenv("RENDER", "").lower() == "true":
+        # Change this to your actual Render backend URL!
+        return "https://rag-backend.onrender.com/v1"
+    
+    # Check for custom INNGEST_API_BASE environment variable
+    custom_base = os.getenv("INNGEST_API_BASE")
+    if custom_base:
+        return custom_base
+    
+    # Default to local Inngest dev server
+    return "http://127.0.0.1:8288/v1"
 
 
 def fetch_runs(event_id: str) -> list[dict]:

@@ -1,4 +1,4 @@
-# 📄 RAG PDF Chat
+#  RAG PDF Chat
 
 A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask questions about them.
 
@@ -13,7 +13,7 @@ A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask que
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 .
@@ -23,13 +23,19 @@ A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask que
 ├── vector_db.py       # Qdrant vector DB wrapper
 ├── custom_types.py    # Pydantic models for Inngest step I/O
 ├── requirements.txt   # All Python dependencies
+=======
+├── data_loader.py     # PDF loading, chunking, and HF embeddings
+├── vector_db.py       # Qdrant vector DB wrapper
+├── custom_types.py    # Pydantic models
+
 ├── .env               # Your secrets (never commit this)
 └── README.md
 ```
 
 ---
 
-## ✅ Prerequisites
+
+##  Prerequisites
 
 Make sure the following are installed **before** starting:
 
@@ -40,7 +46,7 @@ Make sure the following are installed **before** starting:
 
 ---
 
-## 🚀 Setup — Step by Step
+##  Setup — Step by Step
 
 ### Step 1 — Clone / Download the Project
 
@@ -163,6 +169,7 @@ Open a **new terminal** and run:
 
 ```bash
 # Install Inngest CLI globally (only needed once)
+
 npm install -g inngest-cli
 
 # Start the dev server
@@ -173,19 +180,22 @@ The Inngest dashboard will be available at [http://localhost:8288](http://localh
 
 ---
 
+
 ### Step 8 — Start the FastAPI Backend
 
 Open a **new terminal** (with your virtual environment activated) and run:
+
 
 ```bash
 uvicorn main:app --reload --port 8000
 ```
 
+
 Verify the backend is running:
 
 ```bash
 curl http://localhost:8000/
-# Expected: {"status":"✅ RAG API is running", ...}
+# Expected: {"status":" RAG API is running", ...}
 ```
 
 ---
@@ -194,15 +204,17 @@ curl http://localhost:8000/
 
 Open a **new terminal** (with your virtual environment activated) and run:
 
+
 ```bash
 streamlit run streamlit_app.py
 ```
+
 
 The app will open automatically at [http://localhost:8501](http://localhost:8501).
 
 ---
 
-## 🔄 Running Order (Every Time)
+##  Running Order (Every Time)
 
 You need **4 terminals** running simultaneously in this order:
 
@@ -235,6 +247,7 @@ If you want to clear all ingested documents and start fresh:
 python -c "from qdrant_client import QdrantClient; QdrantClient('http://localhost:6333').delete_collection('docs')"
 
 # Option 2 — curl
+
 curl -X DELETE http://localhost:6333/collections/docs
 ```
 
@@ -242,7 +255,8 @@ Then re-ingest your PDFs through the Streamlit UI.
 
 ---
 
-## 🛑 Stopping All Services
+
+##  Stopping All Services
 
 ```bash
 # Stop Qdrant Docker container
