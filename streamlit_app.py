@@ -49,7 +49,7 @@ input[type="text"]:focus, input[type="number"]:focus {
 """, unsafe_allow_html=True)
 
 
-# ── Safe async runner ─────────────────────────────────────────────────────────
+#  Safe async runner 
 def run_async(coro):
     try:
         loop = asyncio.get_event_loop()
@@ -63,13 +63,13 @@ def run_async(coro):
         return loop.run_until_complete(coro)
 
 
-# ── Inngest client ────────────────────────────────────────────────────────────
+#  Inngest client 
 @st.cache_resource
 def get_inngest_client() -> inngest.Inngest:
     return inngest.Inngest(app_id="rag_app", is_production=False)
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+#  Helpers 
 def save_uploaded_pdf(file) -> Path:
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -139,10 +139,10 @@ def wait_for_run_output(event_id: str, timeout_s: float = 120.0, poll_interval_s
         time.sleep(poll_interval_s)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# UI — Section 1: Ingest
-# ══════════════════════════════════════════════════════════════════════════════
-st.title("📄 Upload a PDF")
+
+# UI  Section 1: Ingest
+
+st.title(" Upload a PDF")
 st.caption("Upload a document to add it to the knowledge base.")
 
 if "last_ingested" not in st.session_state:
@@ -157,7 +157,7 @@ if uploaded is not None and uploaded.name != st.session_state.last_ingested:
         time.sleep(0.3)
 
     st.session_state.last_ingested = uploaded.name
-    st.success(f"✅ Done! **{uploaded.name}** is ready to query.")
+    st.success(f" Done! **{uploaded.name}** is ready to query.")
     st.caption("Upload another PDF to expand the knowledge base.")
 
 elif uploaded is not None:
@@ -166,10 +166,10 @@ elif uploaded is not None:
 st.divider()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# UI — Section 2: Query
-# ══════════════════════════════════════════════════════════════════════════════
-st.title("💬 Ask a Question")
+
+# UI  Section 2: Query
+
+st.title(" Ask a Question")
 st.caption("Ask anything about the uploaded document(s).")
 
 if "last_answer" not in st.session_state:
@@ -191,17 +191,17 @@ if submitted and question.strip():
             st.session_state.last_sources = output.get("sources", [])
 
         except TimeoutError:
-            st.error("⏱ Timed out. Is your backend running?")
+            st.error(" Timed out. Is your backend running?")
         except Exception as e:
-            st.error(f"❌ Error: {e}")
+            st.error(f" Error: {e}")
 
 
-# ── Display Answer ────────────────────────────────────────────────────────────
+#  Display Answer ─
 if st.session_state.last_answer:
-    st.subheader("🧠 Answer")
+    st.subheader(" Answer")
     st.info(st.session_state.last_answer)
 
     if st.session_state.last_sources:
-        with st.expander("📎 Sources", expanded=False):
+        with st.expander(" Sources", expanded=False):
             for s in st.session_state.last_sources:
                 st.markdown(f"- `{s}`")

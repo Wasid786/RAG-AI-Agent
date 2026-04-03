@@ -1,4 +1,4 @@
-# RAG PDF Chat
+# 📄 RAG PDF Chat
 
 A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask questions about them.
 
@@ -13,7 +13,7 @@ A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask que
 
 ---
 
-##  Project Structure
+## 📁 Project Structure
 
 ```
 .
@@ -29,7 +29,7 @@ A Retrieval-Augmented Generation (RAG) app that lets you upload PDFs and ask que
 
 ---
 
-## Prerequisites
+## ✅ Prerequisites
 
 Make sure the following are installed **before** starting:
 
@@ -40,7 +40,7 @@ Make sure the following are installed **before** starting:
 
 ---
 
-##  Setup — Step by Step
+## 🚀 Setup — Step by Step
 
 ### Step 1 — Clone / Download the Project
 
@@ -115,33 +115,13 @@ GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ---
 
-### Step 5 — Generate `requirements.txt` and Install Dependencies
+### Step 5 — Install Dependencies
 
 ```bash
 # Upgrade pip first
 pip install --upgrade pip
-```
 
-Create a `requirements.txt` file with the following content:
-
-```
-fastapi
-uvicorn[standard]
-streamlit
-inngest[fast_api]
-qdrant-client
-llama-index
-llama-index-readers-file
-sentence-transformers
-python-dotenv
-requests
-pydantic
-httpx
-```
-
-Then install everything:
-
-```bash
+# Install all dependencies
 pip install -r requirements.txt
 ```
 
@@ -205,7 +185,7 @@ Verify the backend is running:
 
 ```bash
 curl http://localhost:8000/
-# Expected: {"status":" RAG API is running", ...}
+# Expected: {"status":"✅ RAG API is running", ...}
 ```
 
 ---
@@ -222,7 +202,7 @@ The app will open automatically at [http://localhost:8501](http://localhost:8501
 
 ---
 
-##  Running Order (Every Time)
+## 🔄 Running Order (Every Time)
 
 You need **4 terminals** running simultaneously in this order:
 
@@ -237,7 +217,7 @@ You need **4 terminals** running simultaneously in this order:
 
 ---
 
-##  Models Used
+## 🤖 Models Used
 
 | Purpose | Model | Runs where |
 |---|---|---|
@@ -246,7 +226,7 @@ You need **4 terminals** running simultaneously in this order:
 
 ---
 
-##  Reset the Vector Database
+## 🗑️ Reset the Vector Database
 
 If you want to clear all ingested documents and start fresh:
 
@@ -262,7 +242,7 @@ Then re-ingest your PDFs through the Streamlit UI.
 
 ---
 
-##  Stopping All Services
+## 🛑 Stopping All Services
 
 ```bash
 # Stop Qdrant Docker container
@@ -275,7 +255,7 @@ docker stop qdrant
 
 ---
 
-##  Common Issues
+## ⚠️ Common Issues
 
 **`[WinError 10061] No connection could be made` / Qdrant refused connection**
 → Qdrant Docker container is not running. Run `docker start qdrant` or repeat Step 6.

@@ -1,24 +1,4 @@
-"""
-main.py
-───────
-FastAPI + Inngest backend for the RAG (Retrieval-Augmented Generation) app.
 
-What this file does:
-  1. Exposes two Inngest event-driven functions:
-       • rag/ingest_pdf  — read a PDF, embed it, store in Qdrant
-       • rag/query_pdf_ai — embed a question, search Qdrant, answer with Groq
-
-  2. Starts a FastAPI server that Inngest talks to.
-
-Flow:
-  PDF ──► load_and_chunk_pdf ──► embed_texts (LOCAL) ──► Qdrant (LOCAL)
-  Question ──► embed_texts (LOCAL) ──► Qdrant search ──► Groq LLM ──► Answer
-
-Dependencies you need running:
-  • Qdrant   — docker run -p 6333:6333 qdrant/qdrant
-  • Inngest  — npx inngest-cli@latest dev
-  • This app — uvicorn main:app --reload
-"""
 
 import logging
 import os
@@ -39,20 +19,10 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 
-# ── Groq API settings ─────────────────────────────────────────────────────────
-# Groq provides free, fast LLM inference.
-# Get your API key at: https://console.groq.com
-# Add it to your .env file as:  GROQ_API_KEY=your_key_here
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Which Groq model to use for answering questions.
-# Options (from fastest to most capable):
-#   "llama3-8b-8192"      — very fast, good for simple Q&A
-#   "mixtral-8x7b-32768"  — fast, excellent quality  ← default
-#   "llama3-70b-8192"     — slower, highest quality
-#   "gemma2-9b-it"        — good balance of speed & quality
 CHAT_MODEL = os.getenv("GROQ_MODEL", "mixtral-8x7b-32768")
 
 
@@ -133,9 +103,7 @@ def groq_chat(system_prompt: str, user_prompt: str, temperature: float = 0.2) ->
         raise RuntimeError(f"Unexpected Groq response format: {e}") from e
 
 
-# ── Inngest client ────────────────────────────────────────────────────────────
-# Inngest manages background jobs — it handles retries, scheduling, etc.
-# is_production=False means we're using the local Inngest dev server.
+# Inngest client
 inngest_client = inngest.Inngest(
     app_id="rag_app",
     logger=logging.getLogger("uvicorn"),
@@ -143,14 +111,6 @@ inngest_client = inngest.Inngest(
     serializer=inngest.PydanticSerializer(),
 )
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# FUNCTION 1 — Ingest a PDF
-# Triggered by the event: "rag/ingest_pdf"
-# Steps:
-#   Step 1 — load-and-chunk : read the PDF, split into text chunks
-#   Step 2 — embed-and-upsert: embed chunks locally, store in Qdrant
-# ═══════════════════════════════════════════════════════════════════════════════
 @inngest_client.create_function(
     fn_id="rag_ingest_pdf",
     trigger=inngest.TriggerEvent(event="rag/ingest_pdf"),
@@ -184,11 +144,10 @@ async def rag_ingest_pdf(ctx: inngest.Context):
         chunks    = chunks_and_src.chunks
         source_id = chunks_and_src.source_id
 
-        # ── Local embedding (no API key needed) ──────────────────────────────
+        #  Local embedding no API key needed
         vecs = embed_texts(chunks)
 
-        # Create deterministic UUIDs so re-ingesting the same PDF
-        # overwrites old data instead of creating duplicates.
+
         ids = [
             str(uuid.uuid5(uuid.NAMESPACE_URL, f"{source_id}:{i}"))
             for i in range(len(chunks))
@@ -219,13 +178,8 @@ async def rag_ingest_pdf(ctx: inngest.Context):
     return ingested.model_dump()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # FUNCTION 2 — Answer a question with RAG
-# Triggered by the event: "rag/query_pdf_ai"
-# Steps:
-#   Step 1 — embed-and-search : embed the question locally, search Qdrant
-#   Step 2 — llm-answer       : send context + question to Groq, return answer
-# ═══════════════════════════════════════════════════════════════════════════════
+
 @inngest_client.create_function(
     fn_id="rag_query_pdf",
     trigger=inngest.TriggerEvent(event="rag/query_pdf_ai"),
@@ -274,7 +228,7 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
             "Answer concisely using only the information from the context above:"
         )
 
-        # ── Groq API call (needs GROQ_API_KEY in .env) ──────────────────────
+        # Groq API call 
         return groq_chat(system_prompt, user_prompt, temperature=0.2)
 
     # Read incoming event data
@@ -307,7 +261,7 @@ async def rag_query_pdf_ai(ctx: inngest.Context):
     }
 
 
-# ── FastAPI app ───────────────────────────────────────────────────────────────
+#  FastAPI app
 app = FastAPI(title="RAG PDF API")
 
 
@@ -315,7 +269,7 @@ app = FastAPI(title="RAG PDF API")
 def home():
     """Quick status check — visit http://localhost:8000 in your browser."""
     return {
-        "status": "✅ RAG API is running",
+        "status": " RAG API is running",
         "llm":    f"Groq → {CHAT_MODEL}",
         "embed":  "Local → BAAI/bge-small-en-v1.5 (no API key needed)",
     }

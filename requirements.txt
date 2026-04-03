@@ -9,4 +9,4 @@ llama-index-core
 requests
 pydantic
 streamlit
-groq  # optional
+groq  
